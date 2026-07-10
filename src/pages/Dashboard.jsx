@@ -15,19 +15,18 @@ async function fetchDashboardData(activeSite) {
   ])
   const articles = articlesRes.data
   const recent = articles.data || []
-  const total = articles.total || 0
-  const published = recent.filter(a => a.status === 'published').length
+  const stats = statsRes.data.data || {}
 
   return {
     stats: {
-      total,
-      published,
-      draft: total - published,
+      total: stats.total || 0,
+      published: stats.published || 0,
+      draft: stats.draft || 0,
       categories: catRes.data.count || 0,
     },
     recent,
-    totalViews: statsRes.data.data?.totalViews || 0,
-    mostRead: statsRes.data.data?.mostRead || [],
+    totalViews: stats.totalViews || 0,
+    mostRead: stats.mostRead || [],
   }
 }
 

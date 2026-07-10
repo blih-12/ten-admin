@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { MdAdd, MdEdit, MdDelete, MdClose, MdCheck, MdAutorenew } from 'react-icons/md'
 
 const emptyForm = {
-  rank: '', teamName: '', teamLogo: '', points: 0, played: 0, won: 0, drawn: 0, lost: 0,
+  rank: '', teamId: '', teamName: '', teamLogo: '', points: 0, played: 0, won: 0, drawn: 0, lost: 0,
   goalsFor: 0, goalsAgainst: 0, form: '', description: '',
 }
 
@@ -14,6 +14,7 @@ export default function TableManager({ activeSite, sport }) {
   const [leagueId, setLeagueId] = useState('')
   const [season, setSeason] = useState(new Date().getFullYear())
   const [standings, setStandings] = useState([])
+  const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
@@ -28,6 +29,11 @@ export default function TableManager({ activeSite, sport }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSite, sport])
 
+  useEffect(() => {
+    if (!leagueId) { setTeams([]); return }
+    getAPI(activeSite).get(`/teams?league=${leagueId}`).then(res => setTeams(res.data.data || [])).catch(() => setTeams([]))
+  }, [activeSite, leagueId])
+
   const fetchStandings = async () => {
     if (!leagueId) { setStandings([]); setLoading(false); return }
     setLoading(true)
@@ -39,6 +45,12 @@ export default function TableManager({ activeSite, sport }) {
   }
 
   useEffect(() => { fetchStandings() }, [activeSite, leagueId, season])
+
+  const pickTeam = (teamId) => {
+    const t = teams.find(x => x._id === teamId)
+    if (!t) { setForm(f => ({ ...f, teamId: '', teamName: '', teamLogo: '' })); return }
+    setForm(f => ({ ...f, teamId: t._id, teamName: t.name, teamLogo: t.logo || '' }))
+  }
 
   const handleGenerate = async () => {
     if (!leagueId) return toast.error('Pick a competition first')
@@ -58,12 +70,13 @@ export default function TableManager({ activeSite, sport }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!leagueId) return toast.error('Pick a competition first')
+    if (!form.teamName) return toast.error('Pick a team first')
     try {
       const api = getAPI(activeSite)
       const goalDiff = parseInt(form.goalsFor || 0) - parseInt(form.goalsAgainst || 0)
       const payload = {
         league: leagueId, season, rank: parseInt(form.rank),
-        team: { name: form.teamName, logo: form.teamLogo },
+        team: { ref: form.teamId || undefined, name: form.teamName, logo: form.teamLogo },
         points: parseInt(form.points), played: parseInt(form.played), won: parseInt(form.won),
         drawn: parseInt(form.drawn), lost: parseInt(form.lost),
         goalsFor: parseInt(form.goalsFor), goalsAgainst: parseInt(form.goalsAgainst), goalDiff,
@@ -85,7 +98,7 @@ export default function TableManager({ activeSite, sport }) {
   const handleEdit = (s) => {
     setEditingId(s._id)
     setForm({
-      rank: s.rank, teamName: s.team?.name || '', teamLogo: s.team?.logo || '',
+      rank: s.rank, teamId: s.team?.ref || '', teamName: s.team?.name || '', teamLogo: s.team?.logo || '',
       points: s.points, played: s.played, won: s.won, drawn: s.drawn, lost: s.lost,
       goalsFor: s.goalsFor, goalsAgainst: s.goalsAgainst, form: s.form || '', description: s.description || '',
     })
@@ -141,7 +154,7 @@ export default function TableManager({ activeSite, sport }) {
             variant="secondary"
             disabled={!leagueId || generating}
             onClick={handleGenerate}
-            title="Recomputes the table from every finished, scored fixture stored for this competition/season"
+            title="Rebuilds the table from every team in this competition. No finished fixtures yet -> alphabetical, all stats 0. As results come in, this becomes a real live table."
           >
             <MdAutorenew size={16} className={generating ? 'animate-spin' : ''} /> {generating ? 'Generating...' : 'Generate from Results'}
           </Button>
@@ -154,9 +167,23 @@ export default function TableManager({ activeSite, sport }) {
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               {field('rank', 'Rank', 'number')}
-              {field('teamName', 'Team name')}
+              <div>
+                <label className="text-gray-400 text-xs uppercase tracking-widest block mb-1.5">Team</label>
+                <select
+                  value={form.teamId}
+                  onChange={e => pickTeam(e.target.value)}
+                  className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-yellow-400"
+                >
+                  <option value="">Select a team...</option>
+                  {teams.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                </select>
+              </div>
             </div>
-            {field('teamLogo', 'Team logo URL')}
+            {form.teamLogo && (
+              <div className="flex items-center gap-2 text-gray-400 text-xs">
+                <img src={form.teamLogo} alt="" className="w-5 h-5 object-contain" /> Logo auto-filled from team
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               {field('played', 'Played', 'number')}
               {field('won', 'Won', 'number')}

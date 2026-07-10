@@ -103,7 +103,7 @@ export default function ArticleList() {
                         {article.isTopStory && <MdWhatshot size={14} className="text-orange-400 shrink-0" title="Pinned top story" />}
                         <div className="text-white text-sm font-medium line-clamp-1">{article.title}</div>
                       </div>
-                      <div className="text-gray-500 text-xs mt-0.5">{truncate(article.excerpt, 60)}</div>
+                      <div className="text-gray-500 text-xs mt-0.5 line-clamp-1">{truncate(article.excerpt, 60)}</div>
                     </td>
                     <td className="px-5 py-4 text-gray-400 text-xs max-w-[160px]">
                       {article.teams?.length ? article.teams.map(t => t.name).join(', ') : '—'}

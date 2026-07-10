@@ -38,7 +38,7 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
       )}
 
       <aside
-        className={`fixed lg:static top-0 left-0 z-50 w-64 h-screen lg:min-h-screen bg-gray-950 flex flex-col border-r border-gray-800 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:static top-0 left-0 z-50 w-64 h-screen lg:h-screen bg-gray-950 flex flex-col border-r border-gray-800 transform transition-transform duration-300 ease-in-out overflow-y-auto overscroll-contain ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -84,7 +84,7 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1">
           {navItems.map(item => {
             if (item.adminOnly && user?.role !== 'admin') return null
             if (item.sportsOnly && !isSports) return null

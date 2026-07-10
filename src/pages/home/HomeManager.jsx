@@ -226,7 +226,7 @@ export default function HomeManager() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-white text-sm font-medium line-clamp-1">{a.title}</div>
-                        <div className="text-gray-500 text-xs">{truncate(a.excerpt, 70)}</div>
+                        <div className="text-gray-500 text-xs line-clamp-1">{truncate(a.excerpt, 70)}</div>
                       </div>
                       <div className="flex gap-1.5 shrink-0 flex-wrap">
                         <Button variant="secondary" size="sm" onClick={() => assign(a._id, 'hero')}>

@@ -29,6 +29,9 @@ export default function FixturesManager({ activeSite, sport }) {
   const [leagueId, setLeagueId] = useState('')
   const [teams, setTeams] = useState([])
   const [fixtures, setFixtures] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const PAGE_SIZE = 50
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm())
   const [editingId, setEditingId] = useState(null)
@@ -49,17 +52,20 @@ export default function FixturesManager({ activeSite, sport }) {
     getAPI(activeSite).get(`/teams?league=${leagueId}`).then(res => setTeams(res.data.data || [])).catch(() => setTeams([]))
   }, [activeSite, leagueId])
 
-  const fetchFixtures = async () => {
+  const fetchFixtures = async (targetPage = page) => {
     if (!leagueId) { setFixtures([]); setLoading(false); return }
     setLoading(true)
     try {
-      const res = await getAPI(activeSite).get(`/fixtures?leagueId=${leagueId}&limit=30`)
+      const res = await getAPI(activeSite).get(`/fixtures?leagueId=${leagueId}&limit=${PAGE_SIZE}&page=${targetPage}`)
       setFixtures(res.data.data || [])
+      setTotalPages(res.data.pages || 1)
     } catch (e) { toast.error('Failed to load fixtures') }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchFixtures() }, [activeSite, leagueId])
+  // Reset to page 1 whenever the competition changes
+  useEffect(() => { setPage(1) }, [activeSite, leagueId])
+  useEffect(() => { fetchFixtures(page) }, [activeSite, leagueId, page])
 
   const pickTeam = (side, teamId) => {
     const t = teams.find(x => x._id === teamId)
@@ -284,6 +290,26 @@ export default function FixturesManager({ activeSite, sport }) {
           </div>
         )}
       </div>
+
+      {leagueId && fixtures.length > 0 && (
+        <div className="flex items-center justify-between mt-3 text-sm">
+          <Button
+            variant="secondary"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+          >
+            Prev
+          </Button>
+          <span className="text-gray-500 text-xs">Page {page} of {totalPages}</span>
+          <Button
+            variant="secondary"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
