@@ -7,6 +7,7 @@ import { getAPI } from '../../utils/api'
 import Button from '../../components/ui/Button'
 import toast from 'react-hot-toast'
 import { MdSave, MdPublish, MdArrowBack, MdImage, MdStar, MdWhatshot } from 'react-icons/md'
+import EmbedHtml from '../../components/ui/EmbedHtml'
 
 const modules = {
   toolbar: [
@@ -26,7 +27,7 @@ const emptyForm = {
   teams: [], competitions: [],
   embeddedVideo: '',
   seo: { metaTitle: '', metaDescription: '', keywords: '' },
-  featuredImage: { url: '', publicId: '', alt: '' },
+  featuredImage: { url: '', publicId: '', alt: '', embedHtml: '', thumbnailUrl: '', thumbnailPublicId: '' },
 }
 
 export default function ArticleEditor() {
@@ -42,6 +43,7 @@ export default function ArticleEditor() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [activeTab, setActiveTab] = useState('content')
+  const [imageMode, setImageMode] = useState('upload') // 'upload' | 'embed'
 
   useEffect(() => {
     const api = getAPI(activeSite)
@@ -69,13 +71,14 @@ export default function ArticleEditor() {
             teams: article.teams?.map(t => t._id || t) || [],
             competitions: article.competitions?.map(c => c._id || c) || [],
             embeddedVideo: article.embeddedVideo || '',
-            featuredImage: article.featuredImage || { url: '', publicId: '', alt: '' },
+            featuredImage: article.featuredImage || { url: '', publicId: '', alt: '', embedHtml: '', thumbnailUrl: '', thumbnailPublicId: '' },
             seo: {
               metaTitle: article.seo?.metaTitle || '',
               metaDescription: article.seo?.metaDescription || '',
               keywords: article.seo?.keywords?.join(', ') || '',
             },
           })
+          setImageMode(article.featuredImage?.embedHtml ? 'embed' : 'upload')
         }
       })
     }
@@ -91,10 +94,34 @@ export default function ArticleEditor() {
       const res = await getAPI(activeSite).post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      setForm(f => ({ ...f, featuredImage: { url: res.data.data.url, publicId: res.data.data.publicId, alt: f.title } }))
+      setForm(f => ({ ...f, featuredImage: { url: res.data.data.url, publicId: res.data.data.publicId, alt: f.title, embedHtml: '' } }))
       toast.success('Image uploaded')
     } catch (e) { toast.error('Image upload failed') }
     finally { setUploading(false) }
+  }
+
+  const handleEmbedHtmlChange = (html) => {
+    // Embed and upload are mutually exclusive for a given featured image --
+    // pasting embed code clears any previously uploaded file so the two
+    // don't conflict on the frontend.
+    setForm(f => ({ ...f, featuredImage: { url: '', publicId: '', alt: f.featuredImage.alt, embedHtml: html, thumbnailUrl: f.featuredImage.thumbnailUrl, thumbnailPublicId: f.featuredImage.thumbnailPublicId } }))
+  }
+
+  const [uploadingThumb, setUploadingThumb] = useState(false)
+  const handleThumbnailUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingThumb(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await getAPI(activeSite).post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      setForm(f => ({ ...f, featuredImage: { ...f.featuredImage, thumbnailUrl: res.data.data.url, thumbnailPublicId: res.data.data.publicId } }))
+      toast.success('Thumbnail uploaded')
+    } catch (e) { toast.error('Thumbnail upload failed') }
+    finally { setUploadingThumb(false) }
   }
 
   // Tagging a team auto-adds that team's competition too, since a story
@@ -221,14 +248,82 @@ export default function ArticleEditor() {
           {activeTab === 'media' && (
             <div className="bg-gray-800 rounded-xl p-5 space-y-4">
               <h3 className="text-white font-semibold">Featured Image</h3>
-              {form.featuredImage.url && (
-                <img src={form.featuredImage.url} alt="Featured" className="w-full h-48 object-cover rounded-lg" />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImageMode('upload')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${imageMode === 'upload' ? 'bg-yellow-400 text-black' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                >
+                  Upload Image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageMode('embed')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${imageMode === 'embed' ? 'bg-yellow-400 text-black' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                >
+                  Getty Embed Code
+                </button>
+              </div>
+
+              {imageMode === 'upload' && (
+                <>
+                  {form.featuredImage.url && (
+                    <img src={form.featuredImage.url} alt="Featured" className="w-full h-48 object-cover rounded-lg" />
+                  )}
+                  <label className="flex items-center gap-2 cursor-pointer bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-4 py-3 text-sm transition-all w-fit">
+                    <MdImage size={18} />
+                    {uploading ? 'Uploading...' : 'Upload Image'}
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                  </label>
+                </>
               )}
-              <label className="flex items-center gap-2 cursor-pointer bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-4 py-3 text-sm transition-all w-fit">
-                <MdImage size={18} />
-                {uploading ? 'Uploading...' : 'Upload Image'}
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
-              </label>
+
+              {imageMode === 'embed' && (
+                <>
+                  <div>
+                    <label className="text-gray-400 text-xs uppercase tracking-widest block mb-2">
+                      Getty Images Embed Code
+                    </label>
+                    <p className="text-gray-500 text-xs mb-2">
+                      On gettyimages.com, search for the photo, click the <code className="text-gray-400">&lt;/&gt;</code> embed icon, and paste the snippet it gives you here. Editorial use only -- don't paste a downloaded image URL.
+                    </p>
+                    <textarea
+                      value={form.featuredImage.embedHtml}
+                      onChange={e => handleEmbedHtmlChange(e.target.value)}
+                      rows={6}
+                      placeholder='<iframe src="https://embed.gettyimages.com/embed/..." ...></iframe>'
+                      className="w-full bg-gray-950 text-green-400 font-mono border border-gray-600 rounded-lg px-4 py-2.5 text-xs outline-none focus:border-yellow-400 resize-y"
+                    />
+                  </div>
+                  {form.featuredImage.embedHtml && (
+                    <div>
+                      <label className="text-gray-400 text-xs uppercase tracking-widest block mb-2">Preview</label>
+                      <div className="bg-white rounded-lg p-2 max-w-sm">
+                        <EmbedHtml html={form.featuredImage.embedHtml} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-gray-700">
+                    <label className="text-gray-400 text-xs uppercase tracking-widest block mb-2">
+                      Card Thumbnail (optional)
+                    </label>
+                    <p className="text-gray-500 text-xs mb-2">
+                      Getty's embed can't be cropped into a small homepage/list card -- upload a normal image here (stock photo, graphic, or team logo) to use for those instead. Leave empty and the card will just show "No Image".
+                    </p>
+                    {form.featuredImage.thumbnailUrl && (
+                      <img src={form.featuredImage.thumbnailUrl} alt="Thumbnail" className="w-full max-w-xs h-32 object-cover rounded-lg mb-2" />
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-4 py-2.5 text-sm transition-all w-fit">
+                      <MdImage size={16} />
+                      {uploadingThumb ? 'Uploading...' : 'Upload Thumbnail'}
+                      <input type="file" accept="image/*" onChange={handleThumbnailUpload} className="hidden" disabled={uploadingThumb} />
+                    </label>
+                  </div>
+                </>
+              )}
+
               <div>
                 <label className="text-gray-400 text-xs uppercase tracking-widest block mb-2">YouTube Embed URL</label>
                 <input

@@ -12,6 +12,7 @@ const PAGES = [
   { slug: 'transfers', name: 'Transfers', description: 'Page header, banner image, SEO' },
   { slug: 'about', name: 'About', description: 'Hero, who we are, what we cover, stats, join us CTA' },
   { slug: 'contact', name: 'Contact', description: 'Hero and contact details' },
+  { slug: 'monetization', name: 'Monetization', description: 'AdSense client ID, ad slots, and affiliate banners — toggle and edit without a redeploy' },
 ]
 
 export default function PagesList() {

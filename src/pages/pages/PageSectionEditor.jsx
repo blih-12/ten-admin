@@ -13,6 +13,7 @@ const PAGE_NAMES = {
   transfers: 'Transfers',
   about: 'About',
   contact: 'Contact',
+  monetization: 'Monetization',
 }
 
 const TYPE_OPTIONS = ['text', 'richtext', 'image', 'logo', 'link', 'boolean', 'json']
