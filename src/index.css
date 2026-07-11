@@ -7,3 +7,15 @@
 .ql-editor { min-height: 400px; font-size: 16px; line-height: 1.7; }
 .ql-toolbar { border-radius: 8px 8px 0 0 !important; }
 .ql-container { border-radius: 0 0 8px 8px !important; }
+
+.ql-embed-block {
+  padding: 14px;
+  margin: 10px 0;
+  background: #f3f4f6;
+  border: 1px dashed #9ca3af;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  text-align: center;
+  user-select: none;
+}

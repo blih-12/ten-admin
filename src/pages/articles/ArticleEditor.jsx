@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import ReactQuill from 'react-quill'
+import ReactQuill, { Quill } from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import { useAuth } from '../../context/AuthContext'
 import { getAPI } from '../../utils/api'
@@ -9,15 +9,68 @@ import toast from 'react-hot-toast'
 import { MdSave, MdPublish, MdArrowBack, MdImage, MdStar, MdWhatshot } from 'react-icons/md'
 import EmbedHtml from '../../components/ui/EmbedHtml'
 
+// Custom Quill toolbar icon for the "embed" button (a simple bracketed-frame
+// glyph, distinct from the built-in image icon it sits next to).
+Quill.import('ui/icons').embed =
+  '<svg viewBox="0 0 18 18"><rect class="ql-stroke" x="2" y="4" width="14" height="10" rx="1.5"></rect><path class="ql-stroke" d="M6 8l-2 2 2 2M12 8l2 2-2 2"></path></svg>'
+
+// A custom Quill block embed for dropping a raw third-party embed snippet
+// (Getty Images' "Embed from Getty Images" code being the main case) into
+// the article BODY, separate from the featured-image embed above. Quill's
+// normal HTML model strips <script> tags on save, so the snippet gets
+// stored URI-encoded in a data attribute; the public frontend's content
+// renderer looks for this exact div shape and swaps it for a live
+// <EmbedHtml /> at render time (see splitEmbeds in ArticlePage.jsx).
+const BlockEmbed = Quill.import('blots/block/embed')
+class InlineEmbedBlot extends BlockEmbed {
+  static create(html) {
+    const node = super.create()
+    // NOTE: setting a static `className` on the blot class does NOT
+    // automatically apply it for a custom BlockEmbed -- that's only a real
+    // hook for certain built-in Attributor-based formats. Without this
+    // explicit classList.add, the saved HTML never actually got
+    // class="ql-embed-block" on it, so the frontend's detection regex
+    // silently never matched and the raw placeholder text rendered as
+    // plain text on the live site instead of being swapped for the embed.
+    node.classList.add('ql-embed-block')
+    node.setAttribute('data-embed-html', encodeURIComponent(html))
+    node.setAttribute('contenteditable', 'false')
+    node.textContent = '🔗 Embed (renders live on the site — e.g. Getty Images photo)'
+    return node
+  }
+  static value(node) {
+    return decodeURIComponent(node.getAttribute('data-embed-html') || '')
+  }
+}
+InlineEmbedBlot.blotName = 'embedBlock'
+InlineEmbedBlot.tagName = 'div'
+Quill.register(InlineEmbedBlot)
+
+function insertEmbedHandler() {
+  const html = window.prompt('Paste the embed code (e.g. the full "Embed from Getty Images" snippet):')
+  if (!html || !html.trim()) return
+  // Inside a Quill toolbar handler, `this` is the Toolbar module instance,
+  // not the editor -- the editor is reached via `this.quill`. Calling
+  // this.getSelection() directly throws "not a function".
+  const range = this.quill.getSelection(true)
+  this.quill.insertEmbed(range.index, 'embedBlock', html.trim(), 'user')
+  this.quill.setSelection(range.index + 1, 0, 'user')
+}
+
 const modules = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ list: 'ordered' }, { list: 'bullet' }],
-    ['blockquote', 'code-block'],
-    ['link', 'image'],
-    ['clean'],
-  ],
+  toolbar: {
+    container: [
+      [{ header: [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['blockquote', 'code-block'],
+      ['link', 'image', 'embed'],
+      ['clean'],
+    ],
+    handlers: {
+      embed: insertEmbedHandler,
+    },
+  },
 }
 
 const emptyForm = {
@@ -27,7 +80,8 @@ const emptyForm = {
   teams: [], competitions: [],
   embeddedVideo: '',
   seo: { metaTitle: '', metaDescription: '', keywords: '' },
-  featuredImage: { url: '', publicId: '', alt: '', embedHtml: '', thumbnailUrl: '', thumbnailPublicId: '' },
+  featuredImage: { url: '', publicId: '', alt: '', embedHtml: '', thumbnailUrl: '', thumbnailPublicId: '', thumbnailEmbedHtml: '' },
+  socialImage: { url: '', publicId: '' },
 }
 
 export default function ArticleEditor() {
@@ -44,6 +98,7 @@ export default function ArticleEditor() {
   const [uploading, setUploading] = useState(false)
   const [activeTab, setActiveTab] = useState('content')
   const [imageMode, setImageMode] = useState('upload') // 'upload' | 'embed'
+  const [thumbnailMode, setThumbnailMode] = useState('upload') // 'upload' | 'embed'
 
   useEffect(() => {
     const api = getAPI(activeSite)
@@ -71,7 +126,8 @@ export default function ArticleEditor() {
             teams: article.teams?.map(t => t._id || t) || [],
             competitions: article.competitions?.map(c => c._id || c) || [],
             embeddedVideo: article.embeddedVideo || '',
-            featuredImage: article.featuredImage || { url: '', publicId: '', alt: '', embedHtml: '', thumbnailUrl: '', thumbnailPublicId: '' },
+            featuredImage: article.featuredImage || { url: '', publicId: '', alt: '', embedHtml: '', thumbnailUrl: '', thumbnailPublicId: '', thumbnailEmbedHtml: '' },
+            socialImage: article.socialImage || { url: '', publicId: '' },
             seo: {
               metaTitle: article.seo?.metaTitle || '',
               metaDescription: article.seo?.metaDescription || '',
@@ -79,6 +135,7 @@ export default function ArticleEditor() {
             },
           })
           setImageMode(article.featuredImage?.embedHtml ? 'embed' : 'upload')
+          setThumbnailMode(article.featuredImage?.thumbnailEmbedHtml ? 'embed' : 'upload')
         }
       })
     }
@@ -104,7 +161,14 @@ export default function ArticleEditor() {
     // Embed and upload are mutually exclusive for a given featured image --
     // pasting embed code clears any previously uploaded file so the two
     // don't conflict on the frontend.
-    setForm(f => ({ ...f, featuredImage: { url: '', publicId: '', alt: f.featuredImage.alt, embedHtml: html, thumbnailUrl: f.featuredImage.thumbnailUrl, thumbnailPublicId: f.featuredImage.thumbnailPublicId } }))
+    setForm(f => ({ ...f, featuredImage: { ...f.featuredImage, url: '', publicId: '', embedHtml: html } }))
+  }
+
+  const handleThumbnailEmbedChange = (html) => {
+    // Same mutual-exclusivity as above, but for the thumbnail specifically:
+    // pasting a thumbnail embed (e.g. SmartFrame) clears any uploaded
+    // thumbnail file.
+    setForm(f => ({ ...f, featuredImage: { ...f.featuredImage, thumbnailUrl: '', thumbnailPublicId: '', thumbnailEmbedHtml: html } }))
   }
 
   const [uploadingThumb, setUploadingThumb] = useState(false)
@@ -118,10 +182,31 @@ export default function ArticleEditor() {
       const res = await getAPI(activeSite).post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      setForm(f => ({ ...f, featuredImage: { ...f.featuredImage, thumbnailUrl: res.data.data.url, thumbnailPublicId: res.data.data.publicId } }))
+      setForm(f => ({ ...f, featuredImage: { ...f.featuredImage, thumbnailUrl: res.data.data.url, thumbnailPublicId: res.data.data.publicId, thumbnailEmbedHtml: '' } }))
       toast.success('Thumbnail uploaded')
     } catch (e) { toast.error('Thumbnail upload failed') }
     finally { setUploadingThumb(false) }
+  }
+
+  // Separate upload for the social-share-only image (og:image / twitter:image).
+  // Unlike featuredImage.thumbnailUrl (which shows in article cards/listings),
+  // this never renders anywhere on the site -- it only ever gets read by
+  // Facebook/X crawlers via the Helmet meta tags on the article page.
+  const [uploadingSocial, setUploadingSocial] = useState(false)
+  const handleSocialImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingSocial(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await getAPI(activeSite).post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      setForm(f => ({ ...f, socialImage: { url: res.data.data.url, publicId: res.data.data.publicId } }))
+      toast.success('Social preview image uploaded')
+    } catch (e) { toast.error('Upload failed') }
+    finally { setUploadingSocial(false) }
   }
 
   // Tagging a team auto-adds that team's competition too, since a story
@@ -310,16 +395,58 @@ export default function ArticleEditor() {
                       Card Thumbnail (optional)
                     </label>
                     <p className="text-gray-500 text-xs mb-2">
-                      Getty's embed can't be cropped into a small homepage/list card -- upload a normal image here (stock photo, graphic, or team logo) to use for those instead. Leave empty and the card will just show "No Image".
+                      Getty's embed can't be cropped into a small homepage/list card, but a
+                      responsive embed (e.g. SmartFrame) can. Upload a normal image, paste a
+                      thumbnail-safe embed code, or leave empty and the card will show "No Image".
                     </p>
-                    {form.featuredImage.thumbnailUrl && (
-                      <img src={form.featuredImage.thumbnailUrl} alt="Thumbnail" className="w-full max-w-xs h-32 object-cover rounded-lg mb-2" />
+
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailMode('upload')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${thumbnailMode === 'upload' ? 'bg-yellow-400 text-black' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                      >
+                        Upload Image
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailMode('embed')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${thumbnailMode === 'embed' ? 'bg-yellow-400 text-black' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                      >
+                        Embed Code
+                      </button>
+                    </div>
+
+                    {thumbnailMode === 'upload' ? (
+                      <>
+                        {form.featuredImage.thumbnailUrl && (
+                          <img src={form.featuredImage.thumbnailUrl} alt="Thumbnail" className="w-full max-w-xs h-32 object-cover rounded-lg mb-2" />
+                        )}
+                        <label className="flex items-center gap-2 cursor-pointer bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-4 py-2.5 text-sm transition-all w-fit">
+                          <MdImage size={16} />
+                          {uploadingThumb ? 'Uploading...' : 'Upload Thumbnail'}
+                          <input type="file" accept="image/*" onChange={handleThumbnailUpload} className="hidden" disabled={uploadingThumb} />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <textarea
+                          value={form.featuredImage.thumbnailEmbedHtml}
+                          onChange={e => handleThumbnailEmbedChange(e.target.value)}
+                          rows={4}
+                          placeholder='<script async src="https://embed.smartframe.io/..."></script><smart-frame-embed ...></smart-frame-embed>'
+                          className="w-full bg-gray-950 text-green-400 font-mono border border-gray-600 rounded-lg px-4 py-2.5 text-xs outline-none focus:border-yellow-400 resize-y"
+                        />
+                        {form.featuredImage.thumbnailEmbedHtml && (
+                          <div className="mt-2">
+                            <label className="text-gray-500 text-xs block mb-1">Preview (actual card is smaller than this)</label>
+                            <div className="bg-white rounded-lg p-2 max-w-[200px]">
+                              <EmbedHtml html={form.featuredImage.thumbnailEmbedHtml} />
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
-                    <label className="flex items-center gap-2 cursor-pointer bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-4 py-2.5 text-sm transition-all w-fit">
-                      <MdImage size={16} />
-                      {uploadingThumb ? 'Uploading...' : 'Upload Thumbnail'}
-                      <input type="file" accept="image/*" onChange={handleThumbnailUpload} className="hidden" disabled={uploadingThumb} />
-                    </label>
                   </div>
                 </>
               )}
@@ -354,6 +481,25 @@ export default function ArticleEditor() {
                   />
                 </div>
               ))}
+
+              <div className="pt-4 border-t border-gray-700">
+                <label className="text-gray-400 text-xs uppercase tracking-widest block mb-1">Social Preview Image</label>
+                <p className="text-gray-500 text-xs mb-3">
+                  Used only for the Facebook/X share preview card (og:image). Never shown
+                  on the article page or in card/listing views. If left empty, the share
+                  card falls back to the featured image or card thumbnail, or shows no
+                  image at all if neither exists — set this only if you want a different,
+                  dedicated image just for social shares.
+                </p>
+                {form.socialImage.url && (
+                  <img src={form.socialImage.url} alt="Social preview" className="w-full max-w-xs h-32 object-cover rounded-lg mb-3" />
+                )}
+                <label className="flex items-center gap-2 cursor-pointer bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-4 py-3 text-sm transition-all w-fit">
+                  <MdImage size={18} />
+                  {uploadingSocial ? 'Uploading...' : form.socialImage.url ? 'Replace Image' : 'Upload Image'}
+                  <input type="file" accept="image/*" onChange={handleSocialImageUpload} className="hidden" disabled={uploadingSocial} />
+                </label>
+              </div>
             </div>
           )}
 
