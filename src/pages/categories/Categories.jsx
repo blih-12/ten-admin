@@ -27,12 +27,13 @@ export default function Categories() {
     setLoading(true)
     try {
       const api = getAPI(activeSite)
+      const payload = { ...form, parent: form.parent.trim() === '' ? null : form.parent.trim() }
       if (editing) {
-        await api.put(`/categories/${editing}`, form)
+        await api.put(`/categories/${editing}`, payload)
         toast.success('Category updated')
         setEditing(null)
       } else {
-        await api.post('/categories', form)
+        await api.post('/categories', payload)
         toast.success('Category created')
       }
       setForm({ name: '', description: '', parent: '' })
