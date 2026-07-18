@@ -43,7 +43,7 @@ export default function Dashboard() {
   const totalViews = data?.totalViews || 0
   const mostRead = data?.mostRead || []
 
-  const site = activeSite === 'sports' ? 'Ten Sports' : 'Ten News'
+  const site = activeSite === 'sports' ? 'Tave Sports' : 'Ten News'
 
   return (
     <div>

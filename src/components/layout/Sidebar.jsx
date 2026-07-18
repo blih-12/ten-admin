@@ -47,7 +47,7 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
           <div>
             <div className="text-white font-black text-xl tracking-tight flex items-center gap-2">
               {isSports ? <MdSportsSoccer size={20} className="text-yellow-400" /> : <MdNewspaper size={20} />}
-              {isSports ? 'TEN SPORTS' : 'TEN NEWS'}
+              {isSports ? 'TAVE SPORTS' : 'TEN NEWS'}
             </div>
             <div className="text-gray-500 text-xs mt-1">Admin CMS</div>
           </div>

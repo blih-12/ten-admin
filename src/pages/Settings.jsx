@@ -167,7 +167,7 @@ export default function Settings() {
           <div className={`p-4 rounded-lg border-2 ${activeSite === 'sports' ? 'border-yellow-400 bg-yellow-400/10' : 'border-white bg-white/10'}`}>
             <div className="text-white font-bold text-lg flex items-center gap-2">
               {activeSite === 'sports' ? <MdSportsSoccer className="text-yellow-400" /> : <MdNewspaper />}
-              {activeSite === 'sports' ? 'Ten Sports' : 'Ten News'}
+              {activeSite === 'sports' ? 'Tave Sports' : 'Ten News'}
             </div>
             <div className="text-gray-400 text-sm mt-1">Currently managing this site</div>
           </div>

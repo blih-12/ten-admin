@@ -66,7 +66,7 @@ export default function Team() {
           <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { label: 'Full Name', key: 'name', type: 'text', placeholder: 'John Doe' },
-              { label: 'Email', key: 'email', type: 'email', placeholder: 'john@tensports.com' },
+              { label: 'Email', key: 'email', type: 'email', placeholder: 'john@tavesports.com' },
               { label: 'Password', key: 'password', type: 'password', placeholder: '••••••••' },
             ].map(f => (
               <div key={f.key}>

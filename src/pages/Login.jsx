@@ -46,7 +46,7 @@ export default function Login() {
                       : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
-                  Ten {site.charAt(0).toUpperCase() + site.slice(1)}
+                  {site === 'sports' ? 'Tave Sports' : 'Ten News'}
                 </button>
               ))}
             </div>
@@ -59,7 +59,7 @@ export default function Login() {
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 text-sm outline-none focus:border-yellow-400 transition-colors"
-              placeholder="admin@tensports.com"
+              placeholder="admin@tavesports.com"
               required
             />
           </div>

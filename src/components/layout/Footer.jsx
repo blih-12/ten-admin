@@ -21,7 +21,7 @@ const sections = [
     ],
   },
   {
-    title: 'Ten Sports Channels',
+    title: 'Tave Sports Channels',
     links: [
       { to: '/about', label: 'About Us' },
       { to: '/contact', label: 'Contact' },
@@ -158,7 +158,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-gray-600 text-xs">© {new Date().getFullYear()} Ten Sports. All rights reserved.</p>
+          <p className="text-gray-600 text-xs">© {new Date().getFullYear()} Tave Sports. All rights reserved.</p>
           <div className="flex gap-4">
             {legalLinks.map(l => (
               <Link key={l.to} to={l.to} className="text-gray-600 text-xs hover:text-gray-400 transition-colors">{l.label}</Link>
